@@ -67,9 +67,9 @@ class TronTxDecoder {
                     outputTypes: types,
                     decodedOutput: resMessage
                 };
-                
+
             }
-           
+
             var outputs = utils.defaultAbiCoder.decode(types, encodedResult);
             let outputObject = {_length: types.length}
             for(var i=0; i<types.length; i++){
@@ -127,6 +127,30 @@ class TronTxDecoder {
         }
     }
 
+    async decodeInput(transaction, contractABI) {
+        try{
+            let data = '0x'+transaction.raw_data.contract[0].parameter.value.data;
+            const resultInput = _extractInfoFromABI(data, contractABI);
+            var names = resultInput.namesInput;
+            var inputs = resultInput.inputs;
+            var types = resultInput.typesInput;
+            let inputObject = {_length: names.length};
+            for(var i=0; i<names.length; i++){
+                let input = inputs[i]
+                inputObject[i] = input;
+            }
+            return {
+                methodName: resultInput.method,
+                inputNames: names,
+                inputTypes: types,
+                decodedInput: inputObject
+            };
+
+        }catch(err){
+            throw new Error(err)
+        }
+    }
+
     /**
      * Decode revert message from the transaction hash (if any)
      *
@@ -142,7 +166,7 @@ class TronTxDecoder {
             let contractAddress = transaction.raw_data.contract[0].parameter.value.contract_address;
             if(contractAddress === undefined)
                 throw 'No Contract found for this transaction hash.';
-            
+
             let txStatus = transaction.ret[0].contractRet;
             if(txStatus == 'REVERT'){
                 let encodedResult = await _getHexEncodedResult(transactionID, this.tronNode)
@@ -160,7 +184,7 @@ class TronTxDecoder {
                     revertMessage: ''
                 };
             }
-            
+
         }catch(err){
             throw new Error(err)
         }
@@ -186,7 +210,7 @@ async function _getHexEncodedResult(transactionID, tronNode){
         return "" == transaction.data.contractResult[0] ? transaction.data.resMessage : "0x"+transaction.data.contractResult[0];
     }catch(error){
         throw error;
-    }    
+    }
 }
 
 
@@ -206,7 +230,7 @@ function _genMethodId (methodName, types) {
       acc.push(_handleInputs(x))
       return acc
     }, []).join(',')) + ')'
-  
+
     return utils.keccak256(Buffer.from(input)).slice(2, 10)
 }
 
@@ -217,7 +241,7 @@ function _extractInfoFromABI(data, abi){
     const methodId = Array.from(dataBuf.subarray(0, 4), function (byte) {
         return ('0' + (byte & 0xFF).toString(16)).slice(-2);
     }).join('');
-    
+
     var inputsBuf = dataBuf.subarray(4);
 
     return abi.reduce((acc, obj) => {
@@ -258,7 +282,7 @@ function _extractInfoFromABI(data, abi){
         const hash = _genMethodId(method, typesInput)
         if (hash === methodId) {
             let inputs = []
-            
+
             inputs = utils.defaultAbiCoder.decode(typesInput, inputsBuf);
 
             return {
